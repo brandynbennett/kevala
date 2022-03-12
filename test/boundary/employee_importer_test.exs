@@ -12,7 +12,14 @@ defmodule Kevala.Boundary.EmployeeImporterTest do
     csv = stream_csv(~s("First Name","Email"\n"Marge","marge@simpsons.com"))
 
     assert EmployeeImporter.remove_duplicates(csv) ==
-             {:error, "Headers Last Name,Phone are required, but were not provided"}
+             {:error, "Headers `Last Name,Phone` are required, but were not provided"}
+  end
+
+  test "remove_duplicates/2 returns error if no valid rows" do
+    csv = stream_csv(~s("\"First Name","Email"\n"\"Marge","marge@simpsons.com"))
+
+    assert EmployeeImporter.remove_duplicates(csv) ==
+             {:error, "No valid rows"}
   end
 
   test "remove_duplicates/2 ignores problem-free CSV" do

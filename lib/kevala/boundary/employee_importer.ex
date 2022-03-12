@@ -45,7 +45,7 @@ defmodule Kevala.Boundary.EmployeeImporter do
     if MapSet.subset?(expected, headers) do
       :ok
     else
-      {:error, "Headers #{difference} are required, but were not provided"}
+      {:error, "Headers `#{difference}` are required, but were not provided"}
     end
   end
 
