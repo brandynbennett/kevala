@@ -10,7 +10,7 @@ defmodule Kevala.Boundary.EmployeeImporter do
          {:ok, csv_stream} <- remove_error_rows(csv_stream),
          :ok <- validate_headers(csv_stream),
          header_map <- header_map(csv_stream),
-         data <- dedupe_rows(csv_stream, header_map, strategy),
+         {:ok, data} <- dedupe_rows(csv_stream, header_map, strategy),
          data <- sort(data, header_map) do
       to_csv(data, header_map)
     end
@@ -87,17 +87,21 @@ defmodule Kevala.Boundary.EmployeeImporter do
   defp dedupe_rows(csv_stream, header_map, :email_or_phone) do
     email_dedupe = dedupe_groups(csv_stream, header_map["Email"]) |> MapSet.new()
     phone_dedupe = dedupe_groups(csv_stream, header_map["Phone"]) |> MapSet.new()
-    MapSet.intersection(email_dedupe, phone_dedupe) |> Enum.to_list()
+    {:ok, MapSet.intersection(email_dedupe, phone_dedupe) |> Enum.to_list()}
   end
 
   defp dedupe_rows(csv_stream, header_map, :email) do
     header = header_map["Email"]
-    dedupe_groups(csv_stream, header)
+    {:ok, dedupe_groups(csv_stream, header)}
   end
 
   defp dedupe_rows(csv_stream, header_map, :phone) do
     header = header_map["Phone"]
-    dedupe_groups(csv_stream, header)
+    {:ok, dedupe_groups(csv_stream, header)}
+  end
+
+  defp dedupe_rows(_csv, _header_map, strategy) do
+    {:error, "Cannot deduplicate by #{strategy}"}
   end
 
   defp dedupe_groups(csv_stream, header) do
