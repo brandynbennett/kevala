@@ -5,31 +5,38 @@ defmodule Kevala.Boundary.EmployeeImporter do
 
   @expected_headers ["First Name", "Last Name", "Email", "Phone"]
 
-  def remove_duplicates(csv, _duplicate_detection_strategy \\ :email_or_phone) do
-    with {:ok, data} <- decode(csv),
-         :ok <- validate_headers(data) do
+  def remove_duplicates(csv_stream, strategy \\ :email_or_phone) do
+    with {:ok, csv_stream} <- decode(csv_stream),
+         {:ok, csv_stream} <- remove_error_rows(csv_stream),
+         :ok <- validate_headers(csv_stream),
+         {:ok, data} <- dedupe_rows(csv_stream, strategy) do
       to_csv(data)
     end
   end
 
-  defp decode(csv) do
+  defp decode(csv_stream) do
     try do
-      {:ok, Kevala.CSV.decode(csv, headers: true) |> Enum.to_list()}
+      stream = Kevala.CSV.decode(csv_stream, headers: true) |> Enum.to_list() |> Stream.into([])
+      {:ok, stream}
     rescue
       _error -> {:error, "CSV not parseable"}
     end
   end
 
-  defp validate_headers(data) do
-    with {:ok, row} <- first_valid_row(data),
+  defp remove_error_rows(csv_stream) do
+    {:ok, Stream.filter(csv_stream, &(elem(&1, 0) == :ok))}
+  end
+
+  defp validate_headers(csv_stream) do
+    with {:ok, row} <- first_valid_row(csv_stream),
          {:ok, headers} <- get_headers(row),
          :ok <- find_missing_headers(headers) do
       :ok
     end
   end
 
-  defp first_valid_row(data) do
-    row = Enum.find(data, &(elem(&1, 0) == :ok))
+  defp first_valid_row(csv_stream) do
+    row = Enum.find(csv_stream, &(elem(&1, 0) == :ok))
     if row, do: {:ok, elem(row, 1)}, else: {:error, "No valid rows"}
   end
 
@@ -71,11 +78,14 @@ defmodule Kevala.Boundary.EmployeeImporter do
     String.split(header, " ") |> Enum.map_join(" ", &String.capitalize(&1))
   end
 
-  defp to_csv(data) do
-    header_map = header_map(data)
-    # expected_headers = quote_headers(@expected_headers)
+  defp dedupe_rows(data, _strategy) do
+    {:ok, data}
+  end
 
-    Enum.reduce(data, [@expected_headers], fn
+  defp to_csv(csv_stream) do
+    header_map = header_map(csv_stream)
+
+    Enum.reduce(csv_stream, [@expected_headers], fn
       {:ok, row}, acc ->
         Enum.concat(acc, [row_to_csv(row, header_map)])
 
@@ -87,8 +97,8 @@ defmodule Kevala.Boundary.EmployeeImporter do
     |> Enum.join("")
   end
 
-  defp header_map(data) do
-    {:ok, row} = first_valid_row(data)
+  defp header_map(csv_stream) do
+    {:ok, row} = first_valid_row(csv_stream)
     {:ok, headers} = get_headers(row)
 
     Enum.reduce(@expected_headers, %{}, fn expected_header, acc ->

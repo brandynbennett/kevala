@@ -6,6 +6,7 @@ defmodule Kevala.Boundary.EmployeeImporterTest do
 
   test "remove_duplicates/2 returns error if not parseable" do
     assert EmployeeImporter.remove_duplicates(:foo) == {:error, "CSV not parseable"}
+    assert EmployeeImporter.remove_duplicates(%{foo: "bar"}) == {:error, "CSV not parseable"}
   end
 
   test "remove_duplicates/2 returns error if missing columns" do
@@ -62,6 +63,22 @@ defmodule Kevala.Boundary.EmployeeImporterTest do
 
     assert EmployeeImporter.remove_duplicates(csv) ==
              ~s(First Name,Last Name,Email,Phone\nMarge,Simpson,marge@simpsons.com,999-999-9999\n)
+  end
+
+  test "remove_duplicates/2 removes duplicate email or phone by default" do
+    csv =
+      stream_csv(
+        ~s(First Name,Last Name,Email,Phone\n) <>
+          ~s(Marge,Simpson,marge@simpsons.com,999-999-9999\n) <>
+          ~s(M,Simpson,marge@simpsons.com,111-111-1111\n) <>
+          ~s(Homer,Simpson,homer@simpsons.com,888-191-2999\n) <>
+          ~s(H,Simpson,h@simpsons.com,888-191-2999)
+      )
+
+    assert EmployeeImporter.remove_duplicates(csv) ==
+             ~s(First Name,Last Name,Email,Phone\n) <>
+               ~s(Marge,Simpson,marge@simpsons.com,999-999-9999\n) <>
+               ~s(Homer,Simpson,homer@simpsons.com,888-191-2999)
   end
 
   defp stream_csv(csv) do
