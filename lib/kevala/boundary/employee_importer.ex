@@ -8,7 +8,7 @@ defmodule Kevala.Boundary.EmployeeImporter do
   def remove_duplicates(csv, _duplicate_detection_strategy \\ :email_or_phone) do
     with {:ok, data} <- decode(csv),
          :ok <- validate_headers(data) do
-      data
+      to_csv(data)
     end
   end
 
@@ -39,8 +39,8 @@ defmodule Kevala.Boundary.EmployeeImporter do
 
   defp find_missing_headers(headers) do
     difference = find_header_difference(headers)
-    expected = MapSet.new(@expected_headers)
-    headers = MapSet.new(headers)
+    expected = lowercase_headers(@expected_headers) |> MapSet.new()
+    headers = lowercase_headers(headers) |> MapSet.new()
 
     if MapSet.subset?(expected, headers) do
       :ok
@@ -50,14 +50,28 @@ defmodule Kevala.Boundary.EmployeeImporter do
   end
 
   defp find_header_difference(headers) do
-    expected = MapSet.new(@expected_headers)
-    headers = MapSet.new(headers)
+    expected = lowercase_headers(@expected_headers) |> MapSet.new()
+    headers = lowercase_headers(headers) |> MapSet.new()
 
     MapSet.difference(expected, headers)
     |> Enum.to_list()
+    |> capitalize_headers()
     |> Enum.join(",")
   end
 
+  defp lowercase_headers(headers) do
+    Enum.map(headers, &String.downcase(&1))
+  end
+
+  defp capitalize_headers(headers) do
+    Enum.map(headers, fn header ->
+      String.split(header, " ") |> Enum.map_join(" ", &String.capitalize(&1))
+    end)
+  end
+
   defp to_csv(data) do
+    Enum.reduce(data, [@expected_headers], fn row, acc ->
+      nil
+    end)
   end
 end
