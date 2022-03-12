@@ -2,7 +2,6 @@ defmodule Kevala.Boundary.EmployeeImporterTest do
   use ExUnit.Case, async: true
 
   alias Kevala.Boundary.EmployeeImporter
-  alias Kevala.Core.Employee
 
   test "remove_duplicates/2 returns error if not parseable" do
     assert EmployeeImporter.remove_duplicates(:foo) == {:error, "CSV not parseable"}
@@ -77,8 +76,8 @@ defmodule Kevala.Boundary.EmployeeImporterTest do
 
     assert EmployeeImporter.remove_duplicates(csv) ==
              ~s(First Name,Last Name,Email,Phone\n) <>
-               ~s(Marge,Simpson,marge@simpsons.com,999-999-9999\n) <>
-               ~s(Homer,Simpson,homer@simpsons.com,888-191-2999)
+               ~s(Homer,Simpson,homer@simpsons.com,888-191-2999\n) <>
+               ~s(Marge,Simpson,marge@simpsons.com,999-999-9999\n)
   end
 
   defp stream_csv(csv) do

@@ -10,7 +10,8 @@ defmodule Kevala.Boundary.EmployeeImporter do
          {:ok, csv_stream} <- remove_error_rows(csv_stream),
          :ok <- validate_headers(csv_stream),
          header_map <- header_map(csv_stream),
-         data <- dedupe_rows(csv_stream, header_map, strategy) do
+         data <- dedupe_rows(csv_stream, header_map, strategy),
+         data <- sort(data, header_map) do
       to_csv(data, header_map)
     end
   end
@@ -104,6 +105,11 @@ defmodule Kevala.Boundary.EmployeeImporter do
     |> Enum.reduce([], fn {_key, rows}, acc ->
       [Enum.at(rows, 0) | acc]
     end)
+  end
+
+  defp sort(csv, header_map) do
+    header = header_map["First Name"]
+    Enum.sort_by(csv, & &1[header])
   end
 
   defp to_csv(csv_stream, header_map) do
