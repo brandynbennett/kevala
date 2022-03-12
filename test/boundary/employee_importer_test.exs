@@ -25,6 +25,16 @@ defmodule Kevala.Boundary.EmployeeImporterTest do
              ~s(First Name,Last Name,Email,Phone\nMarge,Simpson,marge@simpsons.com,999-999-9999\n)
   end
 
+  test "remove_duplicates/2 ignores non-usable headers" do
+    csv =
+      stream_csv(
+        ~s(first name,last name,email,phone,foo,bar\nMarge,Simpson,marge@simpsons.com,999-999-9999,abc,123)
+      )
+
+    assert EmployeeImporter.remove_duplicates(csv) ==
+             ~s(First Name,Last Name,Email,Phone\nMarge,Simpson,marge@simpsons.com,999-999-9999\n)
+  end
+
   test "remove_duplicates/2 returns error if no valid rows" do
     csv = stream_csv(~s(First Name,Email\n\"Marge,marge@simpsons.com))
 
