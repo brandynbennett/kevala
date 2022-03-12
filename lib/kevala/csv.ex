@@ -5,4 +5,8 @@ defmodule Kevala.CSV do
   def decode(stream, options \\ []) do
     CSV.decode(stream, options)
   end
+
+  def encode(list, options \\ []) do
+    CSV.encode(list, options)
+  end
 end
