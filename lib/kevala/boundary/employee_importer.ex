@@ -9,8 +9,9 @@ defmodule Kevala.Boundary.EmployeeImporter do
     with {:ok, csv_stream} <- decode(csv_stream),
          {:ok, csv_stream} <- remove_error_rows(csv_stream),
          :ok <- validate_headers(csv_stream),
-         {:ok, data} <- dedupe_rows(csv_stream, strategy) do
-      to_csv(data)
+         header_map <- header_map(csv_stream),
+         data <- dedupe_rows(csv_stream, header_map, strategy) do
+      to_csv(data, header_map)
     end
   end
 
@@ -24,7 +25,11 @@ defmodule Kevala.Boundary.EmployeeImporter do
   end
 
   defp remove_error_rows(csv_stream) do
-    {:ok, Stream.filter(csv_stream, &(elem(&1, 0) == :ok))}
+    stream =
+      Stream.filter(csv_stream, &(elem(&1, 0) == :ok))
+      |> Enum.map(&elem(&1, 1))
+
+    {:ok, stream}
   end
 
   defp validate_headers(csv_stream) do
@@ -36,8 +41,8 @@ defmodule Kevala.Boundary.EmployeeImporter do
   end
 
   defp first_valid_row(csv_stream) do
-    row = Enum.find(csv_stream, &(elem(&1, 0) == :ok))
-    if row, do: {:ok, elem(row, 1)}, else: {:error, "No valid rows"}
+    row = Enum.at(csv_stream, 0)
+    if row, do: {:ok, row}, else: {:error, "No valid rows"}
   end
 
   defp get_headers(row) do
@@ -78,19 +83,32 @@ defmodule Kevala.Boundary.EmployeeImporter do
     String.split(header, " ") |> Enum.map_join(" ", &String.capitalize(&1))
   end
 
-  defp dedupe_rows(data, _strategy) do
-    {:ok, data}
+  defp dedupe_rows(csv_stream, header_map, :email_or_phone) do
+    email_dedupe = dedupe_groups(csv_stream, header_map["Email"]) |> MapSet.new()
+    phone_dedupe = dedupe_groups(csv_stream, header_map["Phone"]) |> MapSet.new()
+    MapSet.intersection(email_dedupe, phone_dedupe) |> Enum.to_list()
   end
 
-  defp to_csv(csv_stream) do
-    header_map = header_map(csv_stream)
+  defp dedupe_rows(csv_stream, header_map, :email) do
+    header = header_map["Email"]
+    dedupe_groups(csv_stream, header)
+  end
 
-    Enum.reduce(csv_stream, [@expected_headers], fn
-      {:ok, row}, acc ->
-        Enum.concat(acc, [row_to_csv(row, header_map)])
+  defp dedupe_rows(csv_stream, header_map, :phone) do
+    header = header_map["Phone"]
+    dedupe_groups(csv_stream, header)
+  end
 
-      {:error, _row}, acc ->
-        acc
+  defp dedupe_groups(csv_stream, header) do
+    Enum.group_by(csv_stream, & &1[header])
+    |> Enum.reduce([], fn {_key, rows}, acc ->
+      [Enum.at(rows, 0) | acc]
+    end)
+  end
+
+  defp to_csv(csv_stream, header_map) do
+    Enum.reduce(csv_stream, [@expected_headers], fn row, acc ->
+      Enum.concat(acc, [row_to_csv(row, header_map)])
     end)
     |> Kevala.CSV.encode(delimiter: "\n")
     |> Enum.to_list()
