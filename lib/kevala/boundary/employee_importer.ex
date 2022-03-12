@@ -3,7 +3,7 @@ defmodule Kevala.Boundary.EmployeeImporter do
   Import employee data from a CSV
   """
 
-  @expected_headers ["First Name", "Last Name", "Phone", "Email"]
+  @expected_headers ["First Name", "Last Name", "Email", "Phone"]
 
   def remove_duplicates(csv, _duplicate_detection_strategy \\ :email_or_phone) do
     with {:ok, data} <- decode(csv),
@@ -64,14 +64,43 @@ defmodule Kevala.Boundary.EmployeeImporter do
   end
 
   defp capitalize_headers(headers) do
-    Enum.map(headers, fn header ->
-      String.split(header, " ") |> Enum.map_join(" ", &String.capitalize(&1))
-    end)
+    Enum.map(headers, &capitalize_header/1)
+  end
+
+  defp capitalize_header(header) do
+    String.split(header, " ") |> Enum.map_join(" ", &String.capitalize(&1))
   end
 
   defp to_csv(data) do
-    Enum.reduce(data, [@expected_headers], fn row, acc ->
-      nil
+    header_map = header_map(data)
+    # expected_headers = quote_headers(@expected_headers)
+
+    Enum.reduce(data, [@expected_headers], fn
+      {:ok, row}, acc ->
+        Enum.concat(acc, [row_to_csv(row, header_map)])
+
+      {:error, _row}, acc ->
+        acc
+    end)
+    |> Kevala.CSV.encode(delimiter: "\n")
+    |> Enum.to_list()
+    |> Enum.join("")
+  end
+
+  defp header_map(data) do
+    {:ok, row} = first_valid_row(data)
+    {:ok, headers} = get_headers(row)
+
+    Enum.reduce(@expected_headers, %{}, fn expected_header, acc ->
+      header = Enum.find(headers, fn header -> capitalize_header(header) == expected_header end)
+      Map.put(acc, expected_header, header)
+    end)
+  end
+
+  defp row_to_csv(row, header_map) do
+    Enum.reduce(@expected_headers, [], fn expected_header, acc ->
+      header = header_map[expected_header]
+      Enum.concat(acc, [row[header]])
     end)
   end
 end
